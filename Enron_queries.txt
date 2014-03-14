@@ -1,0 +1,71 @@
+CREATE EXTERNAL TABLE emails
+(eid STRING, timestamp STRING, from_email STRING, to_email STRING, cc STRING, subject STRING, context STRING)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE
+LOCATION 's3n://spring-2014-ds/enron_dataset/';
+
+/* Top 10 mailers */
+CREATE TABLE top100_mails_sent
+(from_email STRING, sent_mail_count INT)
+STORED AS TEXTFILE
+LOCATION 's3n://srinivasaneds/output/top10_mails_sent/';
+
+INSERT OVERWRITE TABLE top10_mails_sent
+select from_email AS sender, count(DISTINCT each_to_mail) AS sent_mail_count
+FROM emails LATERAL VIEW EXPLODE(SPLIT(emails.to_email,',')) emails_split AS each_to_mail
+group by from_email
+order by sent_mail_count DESC
+LIMIT 10;
+
+/* Top 10 Subjects */
+CREATE TABLE top100_subjects
+(mail_subject STRING, mail_subject_count INT)
+STORED AS TEXTFILE
+LOCATION 's3n://srinivasaneds/output/top100_subject_discussed/';
+
+INSERT OVERWRITE TABLE top100_subjects
+select subject AS Email_subject, count(subject) AS mail_subject_count
+FROM emails LATERAL VIEW EXPLODE(SPLIT(emails.to_email,',')) emails_split AS each_to_mail
+group by subject
+order by mail_subject_count DESC
+LIMIT 10;
+
+/* Peak hour */
+CREATE TABLE top10_peak_hours
+(Hour INT, time_count INT)
+STORED AS TEXTFILE
+LOCATION 's3n://srinivasaneds/output/top10_peak_hours/';
+
+INSERT OVERWRITE TABLE top10_peak_hours
+select substr(split(timestamp, " ")[4], 0,2) AS Hour, count(*) AS time_count
+FROM emails LATERAL VIEW EXPLODE(SPLIT(emails.to_email,',')) emails_split AS each_to_mail
+group by substr(split(timestamp, " ")[4], 0,2)
+order by time_count DESC
+LIMIT 10;
+
+/* top 10 Peak month, year */
+CREATE TABLE top10_peak_month_year
+(Month STRING, time_count INT)
+STORED AS TEXTFILE
+LOCATION 's3n://srinivasaneds/output/peak_month/';
+
+INSERT OVERWRITE TABLE top10_peak_month_year
+select substr(split(timestamp, " ")[2], 0,3) AS Month, substr(split(timestamp, " ")[2], 0,4) AS Year, count(*) AS time_count
+FROM emails LATERAL VIEW EXPLODE(SPLIT(emails.to_email,',')) emails_split AS each_to_mail
+group by substr(split(timestamp, " ")[2], 0,2), substr(split(timestamp, " ")[2], 0,4) 
+order by time_count DESC
+LIMIT 10;
+
+/* Peak year */
+CREATE TABLE top10_peak_year
+(Year STRING, time_count INT)
+STORED AS TEXTFILE
+LOCATION 's3n://srinivasaneds/output/top10_peak_year/';
+
+INSERT OVERWRITE TABLE top10_peak_year
+select substr(split(timestamp, " ")[3], 0,4) AS Year, count(*) AS time_count
+FROM emails LATERAL VIEW EXPLODE(SPLIT(emails.to_email,',')) emails_split AS each_to_mail
+group by substr(split(timestamp, " ")[3], 0,4)
+order by time_count DESC
+LIMIT 10;
